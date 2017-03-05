@@ -9,9 +9,6 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-
-	"github.com/drone/drone-go/drone"
-	"github.com/drone/drone-go/plugin"
 )
 
 // Params desribes how to upload a Python module to PyPI.
@@ -20,28 +17,42 @@ type Params struct {
 	Password      *string  `json:"password,omitempty"`
 	Repository    *string  `json:"repository,omitempty"`
 	Username      *string  `json:"username,omitempty"`
+	UploadPath    *string  `json:"upload_path,omitempty"`
 }
 
 func main() {
-	w := drone.Workspace{}
-	v := Params{}
-	plugin.Param("workspace", &w)
-	plugin.Param("vargs", &v)
-	plugin.MustParse()
+	// Parse parameters from environment
+	repository := os.Getenv("PLUGIN_REPOSITORY")
+	username := os.Getenv("PLUGIN_USERNAME")
+	password := os.Getenv("PLUGIN_PASSWORD")
+	uploadPath := os.Getenv("PLUGIN_UPLOAD_PATH")
+	var distributions []string
+	if dString, dExists := os.LookupEnv("PLUGIN_DISTRIBUTIONS"); dExists == true {
+		distributions = strings.Split(dString, ",")
+	} else {
+		distributions = []string{}
+	}
+	v := Params{
+		Repository:    &repository,
+		Username:      &username,
+		Password:      &password,
+		Distributions: distributions,
+		UploadPath:    &uploadPath,
+	}
 
-	err := v.Deploy(&w)
+	err := v.Deploy()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 // Deploy creates a PyPI configuration file and uploads a module.
-func (v *Params) Deploy(w *drone.Workspace) error {
+func (v *Params) Deploy() error {
 	err := v.CreateConfig()
 	if err != nil {
 		return err
 	}
-	err = v.UploadDist(w)
+	err = v.UploadDist()
 	if err != nil {
 		return err
 	}
@@ -66,9 +77,9 @@ func (v *Params) CreateConfig() error {
 }
 
 // UploadDist executes a distutils command to upload a python module.
-func (v *Params) UploadDist(w *drone.Workspace) error {
+func (v *Params) UploadDist() error {
 	cmd := v.Upload()
-	cmd.Dir = w.Path
+	cmd.Dir = path.Join(os.Getenv("PWD"), *v.UploadPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	fmt.Println("$", strings.Join(cmd.Args, " "))
