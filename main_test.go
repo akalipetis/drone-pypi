@@ -5,8 +5,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/drone/drone-go/drone"
 )
 
 // TestPublish checks if this module can successfully publish a PyPI
@@ -21,7 +19,7 @@ import (
 //
 // For example:
 //
-//     $ export DRONE_PYPI_PATH=testdata
+//     $ export DRONE_PYPI_UPLOAD_PATH=testdata
 //     $ export DRONE_PYPI_REPOSITORY=https://testpypi.python.org/pypi
 //     $ export DRONE_PYPI_USERNAME=drone_pypi_test
 //     $ export DRONE_PYPI_PASSWORD=$uper$ecretPassword
@@ -32,20 +30,22 @@ import (
 // > however setup.py still returns zero to the shell so this appears as a
 // > successful test.
 func TestPublish(t *testing.T) {
-	w := drone.Workspace{Path: os.Getenv("DRONE_PYPI_PATH")}
+	if _, exists := os.LookupEnv("DRONE_PYPI_UPLOAD_PATH"); exists != true {
+		t.Skip("DRONE_PYPI_UPLOAD_PATH not set")
+	}
+
 	repository := os.Getenv("DRONE_PYPI_REPOSITORY")
 	username := os.Getenv("DRONE_PYPI_USERNAME")
 	password := os.Getenv("DRONE_PYPI_PASSWORD")
+	uploadPath := os.Getenv("DRONE_PYPI_UPLOAD_PATH")
 	v := Params{
 		Repository:    &repository,
 		Username:      &username,
 		Password:      &password,
-		Distributions: strings.Split(os.Getenv("DRONE_PYPI_DISTRIBUTIONS"), " "),
+		Distributions: strings.Split(os.Getenv("DRONE_PYPI_DISTRIBUTIONS"), ","),
+		UploadPath:    &uploadPath,
 	}
-	if w.Path == "" {
-		t.Skip("DRONE_PYPI_PATH not set")
-	}
-	err := v.Deploy(&w)
+	err := v.Deploy()
 	if err != nil {
 		t.Error(err)
 	}
